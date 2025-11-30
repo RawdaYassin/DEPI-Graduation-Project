@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Land Classification</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;}
+body{
+    background:linear-gradient(135deg, rgba(59,141,153,0.25) 0%, rgba(107,186,98,0.25) 100%), #c7b29b;
+    min-height:100vh;
+    padding:20px;
+}
+.container{
+    max-width:1200px;
+    margin:0 auto;
+    background:white;
+    border-radius:20px;
+    box-shadow:0 20px 60px rgba(0,0,0,0.3);
+    overflow:hidden;
+}
+.header{
+    background:linear-gradient(135deg,#3b8d99 0%,#6bba62 100%);
+    color:white;
+    padding:30px;
+    text-align:center;
+}
+.header h1{font-size:2.5em;margin-bottom:10px;}
+.header p{font-size:1.1em;opacity:0.9;}
+.content{padding:30px;}
+
+.tabs{display:flex;gap:10px;margin-bottom:30px;border-bottom:2px solid #e8f0ea;}
+.tab{
+    padding:15px 30px;
+    background:none;
+    border:none;
+    cursor:pointer;
+    font-size:1.1em;
+    color:#4d5d50;
+    border-bottom:3px solid transparent;
+    transition:all 0.3s;
+}
+.tab.active{
+    color:#3b8d99;
+    border-bottom-color:#3b8d99;
+    font-weight:bold;
+}
+.tab:hover{color:#3b8d99;}
+
+.tab-content{display:none;}
+.tab-content.active{display:block;animation:fadeIn 0.5s;}
+
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+
+#map{
+    width:100%;
+    height:500px;
+    border-radius:15px;
+    box-shadow:0 5px 15px rgba(0,0,0,0.1);
+    margin-bottom:20px;
+}
+
+.upload-area{
+    border:3px dashed #3b8d99;
+    border-radius:15px;
+    padding:60px;
+    text-align:center;
+    cursor:pointer;
+    transition:all 0.3s;
+    background:#f2fff4;
+}
+.upload-area:hover{
+    border-color:#6bba62;
+    background:#e9ffed;
+}
+.upload-area.drag-over{
+    background:#e8ffea;
+    border-color:#6bba62;
+}
+.upload-icon{font-size:4em;margin-bottom:20px;}
+
+.btn{
+    background:linear-gradient(135deg,#3b8d99 0%,#6bba62 100%);
+    color:white;
+    border:none;
+    padding:15px 40px;
+    font-size:1.1em;
+    border-radius:30px;
+    cursor:pointer;
+    transition:all 0.3s;
+    box-shadow:0 5px 15px rgba(67,160,71,0.3);
+}
+.btn:hover{
+    transform:translateY(-2px);
+    box-shadow:0 8px 20px rgba(67,160,71,0.4);
+}
+.btn:disabled{background:#ccc;cursor:not-allowed;box-shadow:none;}
+
+.result-box{
+    margin-top:30px;
+    padding:30px;
+    background:linear-gradient(135deg,#eef8f0 0%,#e0f4e3 100%);
+    border-radius:15px;
+    display:none;
+    animation:slideIn 0.5s;
+}
+@keyframes slideIn{from{opacity:0;transform:translateY(-20px);}to{opacity:1;transform:translateY(0);}}
+
+.result-box.show{display:block;}
+.result-title{font-size:1.5em;color:#3b8d99;margin-bottom:15px;font-weight:bold;}
+.result-content{font-size:2em;color:#2f4f3f;font-weight:bold;margin:20px 0;}
+.result-info{color:#4f5d4a;font-size:1em;margin-top:10px;margin-bottom:20px;}
+
+.result-images{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:20px;
+    margin-top:20px;
+}
+
+.result-images.single-chart{
+    grid-template-columns:1fr;
+    max-width:600px;
+    margin-left:auto;
+    margin-right:auto;
+}
+
+@media (max-width:768px){
+    .result-images{grid-template-columns:1fr;}
+}
+
+.image-container{
+    text-align:center;
+}
+
+.image-container h3{
+    color:#3b8d99;
+    margin-bottom:10px;
+    font-size:1.2em;
+}
+
+.preview-image{
+    width:100%;
+    height:400px;
+    object-fit:contain;
+    border-radius:10px;
+    box-shadow:0 5px 15px rgba(0,0,0,.2);
+    background:#f8f9fa;
+}
+
+.loading{display:none;text-align:center;margin-top:20px;}
+.loading.show{display:block;}
+.spinner{
+    border:4px solid #f3f3f3;
+    border-top:4px solid #3b8d99;
+    border-radius:50%;
+    width:50px;
+    height:50px;
+    animation:spin 1s linear infinite;
+    margin:20px auto;
+}
+@keyframes spin{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
+
+.error-box{
+    background:#ffefef;
+    color:#c62828;
+    padding:20px;
+    border-radius:10px;
+    margin-top:20px;
+    display:none;
+}
+.error-box.show{display:block;}
+
+.coordinates-display{
+    background:white;
+    padding:15px;
+    border-radius:10px;
+    margin-bottom:15px;
+    box-shadow:0 2px 10px rgba(0,0,0,.1);
+}
+.coordinates-display strong{color:#3b8d99;}
+
+.file-type-selector{
+    margin:20px 0;
+    text-align:center;
+}
+.file-type-selector label{
+    margin:0 15px;
+    font-size:1.1em;
+    cursor:pointer;
+}
+input[type="file"]{display:none;}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="header">
+<h1>Land Classification</h1>
+<p>Classify Land Types using Satellite Imagery</p>
+</div>
+
+<div class="content">
+<div class="tabs">
+<button class="tab active" onclick="switchTab('map')">Select from Map</button>
+<button class="tab" onclick="switchTab('upload')">Upload Image</button>
+</div>
+
+<div id="map-tab" class="tab-content active">
+<div id="map"></div>
+<div class="coordinates-display" id="coords-display" style="display:none;">
+<strong>Selected Coordinates:</strong> <span id="coords-text"></span>
+</div>
+<button class="btn" id="predict-btn" onclick="predictFromMap()" disabled>Analyze Location</button>
+</div>
+
+<div id="upload-tab" class="tab-content">
+<div class="file-type-selector">
+<label><input type="radio" name="file_type" value="rgb" checked>RGB Image (JPEG/PNG)</label>
+<label><input type="radio" name="file_type" value="tif">TIFF Image</label>
+</div>
+
+<div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
+<div class="upload-icon">+</div>
+<h3>Click or Drag Image Here</h3>
+<p>Supported formats: JPEG, PNG, TIFF</p>
+<input type="file" id="file-input" accept="image/*,.tif,.tiff" onchange="handleFileSelect(event)">
+</div>
+
+<div id="preview-container"></div>
+<button class="btn" id="upload-predict-btn" onclick="predictFromUpload()" disabled style="margin-top:20px;">Analyze Image</button>
+</div>
+
+<div class="loading" id="loading">
+<div class="spinner"></div>
+<p>Analyzing... This may take a minute</p>
+</div>
+
+<div class="error-box" id="error-box"></div>
+
+<div class="result-box" id="result-box">
+<div class="result-title">Prediction Result</div>
+<div class="result-content" id="result-text"></div>
+<div class="result-info" id="result-info"></div>
+
+<hr style="margin:20px 0;border:none;border-top:2px solid #d0e8d5;">
+
+<div class="result-images">
+<div class="image-container">
+<h3>Satellite Image</h3>
+<img id="result-image" class="preview-image" style="display:none;">
+</div>
+<div class="image-container">
+<h3>Confidence Distribution</h3>
+<img id="result-chart" class="preview-image" style="display:none;">
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+let map, marker;
+let selectedLat, selectedLng;
+let uploadedFile;
+
+map = L.map('map').setView([30.0444, 31.2357],10);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors'}).addTo(map);
+
+map.on('click', e=>{
+    selectedLat=e.latlng.lat; 
+    selectedLng=e.latlng.lng;
+    if(marker) map.removeLayer(marker);
+    marker=L.marker([selectedLat,selectedLng]).addTo(map);
+    map.flyTo([selectedLat, selectedLng], 12, {animate:true, duration:1});
+    document.getElementById('coords-display').style.display='block';
+    document.getElementById('coords-text').textContent=`${selectedLat.toFixed(6)}, ${selectedLng.toFixed(6)}`;
+    document.getElementById('predict-btn').disabled=false;
+});
+
+function switchTab(tabName){
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+    if(tabName==='map'){
+        document.querySelector('.tab:first-child').classList.add('active');
+        document.getElementById('map-tab').classList.add('active');
+        setTimeout(()=>map.invalidateSize(),100);
+    }else{
+        document.querySelector('.tab:last-child').classList.add('active');
+        document.getElementById('upload-tab').classList.add('active');
+    }
+    hideResults();
+}
+
+function handleFileSelect(e){
+    uploadedFile = e.target.files[0];
+    if(!uploadedFile) return;
+
+    const selectedType = document.querySelector('input[name="file_type"]:checked').value;
+
+    if(selectedType==='rgb' && uploadedFile.type==='image/tiff'){
+        showError('You selected a TIFF file but "RGB Image" is chosen. Please select the correct file type.');
+        document.getElementById('upload-predict-btn').disabled=true;
+        return;
+    }
+    if(selectedType==='tif' && !uploadedFile.name.toLowerCase().endsWith('.tif') && !uploadedFile.name.toLowerCase().endsWith('.tiff')){
+        showError('You selected a non-TIFF file but "TIFF Image" is chosen. Please select the correct file type.');
+        document.getElementById('upload-predict-btn').disabled=true;
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(ev){
+        const isTiff = selectedType === 'tif' || uploadedFile.name.toLowerCase().endsWith('.tif') || uploadedFile.name.toLowerCase().endsWith('.tiff');
+        
+        document.getElementById('preview-container').innerHTML=`
+        <div style="margin-top:20px;text-align:center;">
+            <p><strong>File selected:</strong> ${uploadedFile.name}</p>
+            ${isTiff ? 
+                `<img src="https://cdn-icons-png.flaticon.com/512/3767/3767084.png" style="max-width:200px;margin-top:20px;opacity:0.7;" alt="TIFF File">
+                <p style="margin-top:15px;color:#666;">Multi-band TIFF image ready for analysis</p>` :
+                `<img src="${ev.target.result}" class="preview-image" style="max-height:300px;">`
+            }
+        </div>`;
+        document.getElementById('upload-predict-btn').disabled=false;
+        hideError();
+    };
+    reader.readAsDataURL(uploadedFile);
+}
+
+const uploadArea=document.getElementById('upload-area');
+uploadArea.addEventListener('dragover', e=>{
+    e.preventDefault();
+    uploadArea.classList.add('drag-over');
+});
+uploadArea.addEventListener('dragleave', ()=>uploadArea.classList.remove('drag-over'));
+uploadArea.addEventListener('drop', e=>{
+    e.preventDefault();
+    uploadArea.classList.remove('drag-over');
+    document.getElementById('file-input').files=e.dataTransfer.files;
+    handleFileSelect({target:{files:e.dataTransfer.files}});
+});
+
+async function predictFromMap(){
+    showLoading();
+    hideResults();
+    
+    const formData=new FormData();
+    formData.append('input_method','map');
+    formData.append('latitude',selectedLat);
+    formData.append('longitude',selectedLng);
+    
+    try{
+        const res=await fetch('/predict',{method:'POST',body:formData});
+        const data=await res.json();
+        hideLoading();
+        
+        if(data.success) showResult(data);
+        else showError(data.message||'Error during prediction');
+    }catch(err){
+        hideLoading();
+        showError('Connection error: '+err.message);
+    }
+}
+
+async function predictFromUpload(){
+    if(!uploadedFile){
+        showError('Please select a file first');
+        return;
+    }
+    
+    showLoading();
+    hideResults();
+    
+    const formData=new FormData();
+    formData.append('input_method','upload');
+    formData.append('file',uploadedFile);
+    formData.append('file_type',document.querySelector('input[name="file_type"]:checked').value);
+    
+    try{
+        const res=await fetch('/predict',{method:'POST',body:formData});
+        const data=await res.json();
+        hideLoading();
+        
+        if(data.success) showResult(data);
+        else showError(data.message||'Error during prediction');
+    }catch(err){
+        hideLoading();
+        showError('Connection error: '+err.message);
+    }
+}
+
+function showResult(data){
+    const resultBox=document.getElementById('result-box');
+    const resultText=document.getElementById('result-text');
+    const resultInfo=document.getElementById('result-info');
+    const resultImage=document.getElementById('result-image');
+    const resultChart=document.getElementById('result-chart');
+    const resultImages=document.querySelector('.result-images');
+
+    resultText.innerHTML=`${translateLabel(data.prediction)}`;
+
+    let infoHTML='';
+    if(data.confidence) infoHTML+=`<strong>Confidence:</strong> ${data.confidence}<br>`;
+    if(data.location) infoHTML+=`<strong>Location:</strong> ${data.location}<br>`;
+    resultInfo.innerHTML=infoHTML;
+
+    // Show original image (hide for TIFF)
+    const isTiffResult = data.image_url && data.image_url.includes('.tif');
+    
+    if(data.image_url && !isTiffResult){
+        resultImage.parentElement.style.display='block';
+        resultImage.src=data.image_url+'?t='+new Date().getTime();
+        resultImage.style.display='block';
+        resultImages.classList.remove('single-chart');
+    }else{
+        resultImage.parentElement.style.display='none';
+        resultImages.classList.add('single-chart');
+    }
+
+    // Show chart
+    if(data.chart_url){
+        resultChart.src=data.chart_url+'?t='+new Date().getTime();
+        resultChart.style.display='block';
+    }else{
+        resultChart.style.display='none';
+    }
+
+    resultBox.classList.add('show');
+}
+
+function showError(msg){
+    const errorBox=document.getElementById('error-box');
+    errorBox.innerHTML=`<strong>Error:</strong><br>${msg}`;
+    errorBox.classList.add('show');
+}
+
+function hideError(){
+    document.getElementById('error-box').classList.remove('show');
+}
+
+function showLoading(){
+    document.getElementById('loading').classList.add('show');
+}
+
+function hideLoading(){
+    document.getElementById('loading').classList.remove('show');
+}
+
+function hideResults(){
+    document.getElementById('result-box').classList.remove('show');
+    document.getElementById('error-box').classList.remove('show');
+}
+
+function translateLabel(label){
+    const labels={
+        'AnnualCrop':'Annual Crop',
+        'Forest':'Forest',
+        'HerbaceousVegetation':'Herbaceous Vegetation',
+        'Highway':'Highway',
+        'Industrial':'Industrial Area',
+        'Pasture':'Pasture',
+        'PermanentCrop':'Permanent Crop',
+        'Residential':'Residential Area',
+        'River':'River',
+        'SeaLake':'Sea/Lake'
+    };
+    return labels[label]||label;
+}
+</script>
+</body>
+</html>
